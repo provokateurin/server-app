@@ -81,20 +81,22 @@ class UnifiedPushProviderController extends Controller {
 	 * @NoCSRFRequired
 	 * @NoAdminRequired
 	 *
-	 * @return JSONResponse
+	 * Check if the UnifiedPush provider is present
+	 *
+	 * @return JSONResponse<array{success: bool}, Http::STATUS_OK>
 	 */
 	public function check(){
 		return new JSONResponse(['success' => true]);
 	}
 
 	/**
-	 * Set keepalive interval.
+	 * Set keepalive interval
 	 *
 	 * @NoCSRFRequired
 	 *
-	 * @param int $keepalive
+	 * @param int $keepalive Keep alive value in seconds
 	 *
-	 * @return JSONResponse
+	 * @return JSONResponse<array{success: bool}, Http::STATUS_OK>
 	 */
 	public function setKeepalive(int $keepalive){
 		try {
@@ -115,15 +117,15 @@ class UnifiedPushProviderController extends Controller {
 	}
 
 	/**
-	 * Request to create a new deviceId.
+	 * Request to create a new deviceId
 	 *
 	 * @CORS
 	 * @NoCSRFRequired
 	 * @NoAdminRequired
 	 *
-	 * @param string $deviceName
+	 * @param string $deviceName Name of the device
 	 *
-	 * @return JSONResponse
+	 * @return JSONResponse<array{success: bool, deviceId: string}, Http::STATUS_OK>
 	 */
 	public function createDevice(string $deviceName){
 		$deviceId = $this->uuid();
@@ -143,14 +145,18 @@ class UnifiedPushProviderController extends Controller {
 	}
 
 	/**
-	 * Request to get push messages.
+	 * Request to get push messages
+	 *
 	 * This is a public page since it has to be handle by the non-connected app
 	 * (NextPush app and not Nextcloud-app)
 	 *
 	 * @NoCSRFRequired
 	 * @PublicPage
 	 *
-	 * @param string $deviceId
+	 * @param string $deviceId ID of the device
+	 * @return JSONResponse<array{success: bool}, Http::STATUS_UNAUTHORIZED>|void
+	 *
+	 * 401: Missing permissions to sync device
 	 */
 	public function syncDevice(string $deviceId){
 		if (!$this->checkDeviceId($deviceId)) return new JSONResponse(['success' => false], Http::STATUS_UNAUTHORIZED);
@@ -227,14 +233,17 @@ class UnifiedPushProviderController extends Controller {
 	}
 
 	/**
-	 * Delete a device.
+	 * Delete a device
 	 *
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
 	 *
-	 * @param string $deviceId
+	 * @param string $deviceId ID of the device
 	 *
-	 * @return JSONResponse
+	 * @return JSONResponse<array{success: bool}, Http::STATUS_OK|Http::STATUS_UNAUTHORIZED>
+	 *
+	 * 200: Device deleted successfully
+	 * 401: Missing permissions to delete device
 	 */
 	public function deleteDevice(string $deviceId){
 		if (!$this->checkDeviceId($deviceId)) return new JSONResponse(['success' => false], Http::STATUS_UNAUTHORIZED);
@@ -251,16 +260,19 @@ class UnifiedPushProviderController extends Controller {
 	}
 
 	/**
-	 * Create an authorization token for a new 3rd party service.
+	 * Create an authorization token for a new 3rd party service
 	 *
 	 * @NoAdminRequired
 	 * @CORS
 	 * @NoCSRFRequired
 	 *
-	 * @param string $deviceId
-	 * @param string $appName
+	 * @param string $deviceId ID of the device
+	 * @param string $appName Name of the app
 	 *
-	 * @return JSONResponse
+	 * @return JSONResponse<array{success: bool, token: string}, Http::STATUS_OK>|JSONResponse<array{success: bool}, Http::STATUS_UNAUTHORIZED>
+	 *
+	 * 200: App created successfully
+	 * 401: Missing permissions to create app
 	 */
 	public function createApp(string $deviceId, string $appName){
 		if (!$this->checkDeviceId($deviceId)) return new JSONResponse(['success' => false], Http::STATUS_UNAUTHORIZED);
@@ -282,14 +294,17 @@ class UnifiedPushProviderController extends Controller {
 	}
 
 	/**
-	 * Delete an authorization token.
+	 * Delete an authorization token
 	 *
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
 	 *
-	 * @param string $token
+	 * @param string $token Token of the app
 	 *
-	 * @return JSONResponse
+	 * @return JSONResponse<array{success: bool}, Http::STATUS_OK|Http::STATUS_UNAUTHORIZED>
+	 *
+	 * 200: App deleted successfully
+	 * 401: Missing permissions to delete app
 	 */
 	public function deleteApp(string $token){
 		$redis = $this->redisFactory->getInstance();
@@ -322,15 +337,18 @@ class UnifiedPushProviderController extends Controller {
 	}
 
 	/**
-	 * Receive notifications from 3rd parties.
+	 * Receive notifications from 3rd parties
 	 *
 	 * @PublicPage
 	 * @CORS
 	 * @NoCSRFRequired
 	 *
-	 * @param string $token
+	 * @param string $token Token of the app to push to
 	 *
-	 * @return JSONResponse
+	 * @return JSONResponse<array{success: bool}, Http::STATUS_CREATED|Http::STATUS_NOT_FOUND>
+	 *
+	 * 201: Notification pushed successfully
+	 * 404: App not found
 	 */
 	public function push(string $token){
 		$message = file_get_contents('php://input');
@@ -351,7 +369,7 @@ class UnifiedPushProviderController extends Controller {
 	 * @PublicPage
 	 * @NoCSRFRequired
 	 *
-	 * @return JSONResponse
+	 * @return JSONResponse<array{unifiedpush: array{version: int}}, Http::STATUS_OK>
 	 */
 	public function unifiedpushDiscovery(){
 		return new JSONResponse([
@@ -372,7 +390,7 @@ class UnifiedPushProviderController extends Controller {
 	 * @PublicPage
 	 * @NoCSRFRequired
 	 *
-	 * @return JSONResponse
+	 * @return JSONResponse<array{unifiedpush: array{gateway: string}}, Http::STATUS_OK>
 	 */
 	public function gatewayMatrixDiscovery(){
 		return new JSONResponse([
@@ -389,7 +407,7 @@ class UnifiedPushProviderController extends Controller {
 	 * @PublicPage
 	 * @NoCSRFRequired
 	 *
-	 * @return JSONResponse
+	 * @return JSONResponse<array{rejected: string[]}, Http::STATUS_OK>
 	 */
 	public function gatewayMatrix(){
 		$message = json_decode(file_get_contents('php://input'));
